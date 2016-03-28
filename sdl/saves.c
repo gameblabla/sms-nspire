@@ -38,7 +38,7 @@ int load_rom(char *filename)
 	size = ftell(fd);
 	fseek(fd, 0, SEEK_SET);
 
-  /* Don't load games smaller than 32k */
+	/* Don't load games smaller than 32k */
 	if(size < 0x8000) 
 	{
 		if(fd) fclose(fd);
@@ -59,10 +59,21 @@ int load_rom(char *filename)
 	if(fd) fclose(fd);
 
 	/* Figure out game image type */
-	if(strcasecmp(strrchr(filename, '.'), ".gg.tns") == 0)
+	#ifdef GG_BUILD
 		cart.type = TYPE_GG;
-	else
+	#else
 		cart.type = TYPE_SMS;
+	#endif
+	
+	if (strstr (filename,".gg.tns") || strstr (filename,".gg"))
+	{
+		cart.type = TYPE_GG;
+	}
+	else
+	{
+		cart.type = TYPE_SMS;
+	}
+
 	return (1);
 }
 

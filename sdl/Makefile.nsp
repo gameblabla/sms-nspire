@@ -11,15 +11,14 @@ CC        = nspire-gcc
 NAME	  = sms_sdl
 VERSION   = 0.9.3r5
 
-ASMFLAGS  = 
-CFLAGS    = -I/usr/include/SDL -O0
+CFLAGS    = -Ofast -fomit-frame-pointer -fdata-sections -ffunction-sections -Dndlib
 DEFINES   = -DLSB_FIRST
 INCLUDES  = -I. -I.. -Icpu
-LIBS	  = -lSDL -lm
+LIBS	  = -lm -Wl,--as-needed -Wl,--gc-sections -flto
 
-OBJECTS   = main.o saves.o sdlsms.o render.o sms.o system.o vdp.o  cpu/z80.o
+OBJECTS   = main.o  emu_main.o saves.o sdlsms_nspire.o render.o sms.o system.o vdp.o cpu/z80.o n2DLib.o
 
-all: $(NAME) gen
+all: $(NAME)
 
 gen:
 	genzehn --input sms_sdl --output sms.t --compress
@@ -33,14 +32,5 @@ $(NAME): $(OBJECTS)
 .c.o:
 	$(CC) -c $(CFLAGS) $(INCLUDES) $(DEFINES) $< -o $@
 
-%.o: %.asm
-	$(ASM) $(ASMFLAGS) $< -o $@
-
 clean:
 	rm -f $(OBJECTS) $(NAME)
-
-distrib: $(NAME)
-	mkdir sms_sdl-$(VERSION); \
-	cp $(NAME) README.txt sms_sdl-$(VERSION); \
-	tar zcf sms_sdl-$(VERSION)-linux.tar.gz sms_sdl-$(VERSION)/*; \
-	rm -rf sms_sdl-$(VERSION)

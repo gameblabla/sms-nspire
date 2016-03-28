@@ -35,7 +35,7 @@ void sms_frame(int skip_render)
         vdp_run();
 
         /* Draw the current frame */
-        if(!skip_render) render_line(vdp.line);
+        /*if(!skip_render)*/ render_line(vdp.line);
 
         /* Run the Z80 for a line */
         z80_execute(227);

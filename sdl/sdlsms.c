@@ -43,7 +43,7 @@ static int sdl_video_init()
 
   SDL_Init(SDL_INIT_VIDEO);
 
-  sdl_screen = SDL_SetVideoMode(screen_width, screen_height, 16, SDL_SWSURFACE);
+  sdl_screen = SDL_SetVideoMode(320, 240, 16, SDL_SWSURFACE);
 
   memset(&bitmap, 0, sizeof(t_bitmap));
   bitmap.width  = sdl_screen->w;
@@ -81,7 +81,7 @@ static void sdl_video_take_screenshot()
 static void sdl_video_prepare_update()
 {
 	SDL_LockSurface(sdl_screen);
-	bitmap.data = (unsigned char*)sdl_screen->pixels;
+	bitmap.data = (unsigned char*)sdl_screen->pixels + (4 * (3072 - 16));
 }
 
 
@@ -115,9 +115,9 @@ static void sdl_controls_init()
   cfg.pad[0].down = SDLK_DOWN;
   cfg.pad[0].left = SDLK_LEFT;
   cfg.pad[0].right = SDLK_RIGHT;
-  cfg.pad[0].b1 = SDLK_c;
-  cfg.pad[0].b2 = SDLK_v;
-  cfg.pad[0].start = SDLK_RETURN;
+  cfg.pad[0].b1 = SDLK_LCTRL;
+  cfg.pad[0].b2 = SDLK_LSHIFT;
+  cfg.pad[0].start = SDLK_BACKSPACE;
 
   SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 }
@@ -194,10 +194,10 @@ static int sdl_controls_update_input(SDLKey k, int p)
     if(p) input.pad[0] |= INPUT_BUTTON2;
     else  input.pad[0] &= ~INPUT_BUTTON2;
   }
-  else if(k == SDLK_TAB) {
+  /*else if(k == SDLK_TAB) {
     if(p) input.system |= INPUT_HARD_RESET;
     else  input.system &= ~INPUT_HARD_RESET;
-  }
+}*/
   return 1;
 }
 

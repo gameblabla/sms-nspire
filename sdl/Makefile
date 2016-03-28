@@ -6,7 +6,7 @@
 #
 # Define LSB_FIRST for little endian systems.
 
-CC        = clang-3.6
+CC        = gcc
 
 NAME	  = sms_sdl
 VERSION   = 0.9.3r5
@@ -17,7 +17,7 @@ DEFINES   = -DLSB_FIRST
 INCLUDES  = -I. -I.. -Icpu
 LIBS	  = -lSDL -lm
 
-OBJECTS   = main.o saves.o sdlsms.o render.o sms.o system.o vdp.o  cpu/z80.o
+OBJECTS   = emu_main.o main.o saves.o sdlsms.o render.o sms.o system.o vdp.o  cpu/z80.o
 
 all: $(NAME)
 

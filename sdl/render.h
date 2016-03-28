@@ -15,7 +15,6 @@ extern byte is_vram_dirty;
 /* Function prototypes */
 void render_init(void);
 void render_reset(void);
-void render_bg_gg(int line);
 void render_bg_sms(int line);
 void render_obj(int line);
 void render_line(int line);

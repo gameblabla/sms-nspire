@@ -1,9 +1,6 @@
 #include <memory.h>
 #include "shared.h"
 
-/* Background drawing function */
-void (*render_bg)(int line);
-
 /* Pointer to output buffer */
 byte *linebuf;
 
@@ -173,9 +170,6 @@ void render_reset(void)
         vp_hstart = 0;
         vp_hend   = 32;
     }
-
-    /* Pick render routine */
-    render_bg = IS_GG ? render_bg_gg : render_bg_sms;
 }
 
 
@@ -186,7 +180,11 @@ void render_line(int line)
     if((line < vp_vstart) || (line >= vp_vend)) return;
 
     /* Point to current line in output buffer */
-    linebuf = (bitmap.depth == 8) ? &bitmap.data[(line * bitmap.pitch)] : &internal_buffer[0];
+#ifdef _TINSPIRE
+	linebuf = &internal_buffer[0];
+#else
+	linebuf = (bitmap.depth == 8) ? &bitmap.data[(line * bitmap.pitch)] : &internal_buffer[0];
+#endif
 
     /* Update pattern cache */
     update_cache();
@@ -199,7 +197,7 @@ void render_line(int line)
     else
     {
         /* Draw background */
-        render_bg(line);
+        render_bg_sms(line);
 
         /* Draw sprites */
         render_obj(line);
@@ -211,7 +209,11 @@ void render_line(int line)
         }
     }
 
+#ifdef _TINSPIRE
+	remap_8_to_16(line);
+#else
     if(bitmap.depth != 8) remap_8_to_16(line);
+#endif
 }
 
 
@@ -219,67 +221,56 @@ void render_line(int line)
 void render_bg_sms(int line)
 {
     int locked = 0;
-    int v_line = (line + vdp.reg[9]) % 224;
+    int i;
+    int yscroll_mask = 224;
+    int v_line = (line + vdp.reg[9]) % yscroll_mask;
     int v_row  = (v_line & 7) << 3;
     int hscroll = ((vdp.reg[0] & 0x40) && (line < 0x10)) ? 0 : (0x100 - vdp.reg[8]);
-    int column = vp_hstart;
-    word attr;
-    word *nt = (word *)&vdp.vram[vdp.ntab + ((v_line >> 3) << 6)];
+    int column = 0;
+    unsigned short attr;
+    unsigned char *nt = &vdp.vram[vdp.ntab + (((v_line >> 3) << 6) & ((((vdp.reg[2] & 1) | 1) << 10) | (~0U ^ (1 << 10)) ) )];
     int nt_scroll = (hscroll >> 3);
     int shift = (hscroll & 7);
-    dword atex_mask;
-    dword *cache_ptr;
-    dword *linebuf_ptr = (dword *)&linebuf[0 - shift];
+    unsigned char atex_mask;
+
+    unsigned char *cache_ptr;
+    unsigned char *linebuf_ptr = &linebuf[0 - shift];
 
     /* Draw first column (clipped) */
     if(shift)
     {
-        int x, c, a;
+        int x;
 
-        attr = nt[(column + nt_scroll) & 0x1F];
+        for(x = shift; x < 8; x++)
+            linebuf[(0 - shift) + (x)] = 0;
 
-#ifndef LSB_FIRST
-        attr = (((attr & 0xFF) << 8) | ((attr & 0xFF00) >> 8));
-#endif
-        a = (attr >> 7) & 0x30;
-
-        for(x = shift; x < 8; x += 1)
-        {
-            c = cache[((attr & 0x7FF) << 6) | (v_row) | (x)];
-            linebuf[(0 - shift) + (x)  ] = ((c) | (a));
-        }
-
-        column += 1;
+        column++;
     }
 
     /* Draw a line of the background */
-    for(; column < vp_hend; column += 1)
+    for(; column < 32; column++)
     {
         /* Stop vertical scrolling for leftmost eight columns */
         if((vdp.reg[0] & 0x80) && (!locked) && (column >= 24))
         {
             locked = 1;
             v_row = (line & 7) << 3;
-            nt = (word *)&vdp.vram[((vdp.reg[2] << 10) & 0x3800) + ((line >> 3) << 6)];
+            nt = &vdp.vram[((vdp.reg[2] << 10) & 0x3800) + ((line >> 3) << 6)];
         }
 
         /* Get name table attribute word */
-        attr = nt[(column + nt_scroll) & 0x1F];
+        attr = nt[(((column + nt_scroll) & 0x1F) << 1) | 0] | (nt[(((column + nt_scroll) & 0x1F) << 1) | 1] << 8);
 
-#ifndef LSB_FIRST
-        attr = (((attr & 0xFF) << 8) | ((attr & 0xFF00) >> 8));
-#endif
         /* Expand priority and palette bits */
-        atex_mask = atex[(attr >> 11) & 3];
+        atex_mask = (attr >> 7) & 0x30;
 
         /* Point to a line of pattern data in cache */
         cache_ptr = (dword *)&cache[((attr & 0x7FF) << 6) | (v_row)];
         
-        /* Copy the left half, adding the attribute bits in */
-        write_dword( &linebuf_ptr[(column << 1)] , read_dword( &cache_ptr[0] ) | (atex_mask));
-
-        /* Copy the right half, adding the attribute bits in */
-        write_dword( &linebuf_ptr[(column << 1) | (1)], read_dword( &cache_ptr[1] ) | (atex_mask));
+		for( i = 0; i < 8; i++)
+		{
+			linebuf_ptr[column * 8 + i] = cache_ptr[i] | atex_mask;
+		}
     }
 
     /* Draw last column (clipped) */
@@ -287,58 +278,17 @@ void render_bg_sms(int line)
     {
         int x, c, a;
 
-        byte *p = &linebuf[(0 - shift)+(column << 3)];
+        unsigned char *p = &linebuf[(0 - shift)+(column << 3)];
 
-        attr = nt[(column + nt_scroll) & 0x1F];
+		attr = nt[(((column + nt_scroll) & 0x1F) << 1) | 0] | (nt[(((column + nt_scroll) & 0x1F) << 1) | 1] << 8);
 
-#ifndef LSB_FIRST
-        attr = (((attr & 0xFF) << 8) | ((attr & 0xFF00) >> 8));
-#endif
         a = (attr >> 7) & 0x30;
 
-        for(x = 0; x < shift; x += 1)
+        for(x = 0; x < shift; x++)
         {
             c = cache[((attr & 0x7FF) << 6) | (v_row) | (x)];
             p[x] = ((c) | (a));
         }
-    }
-}
-
-
-/* Draw the Game Gear background */
-void render_bg_gg(int line)
-{
-    int v_line = (line + vdp.reg[9]) % 224;
-    int v_row  = (v_line & 7) << 3;
-    int hscroll = (0x100 - vdp.reg[8]);
-    int column;
-    word attr;
-    word *nt = (word *)&vdp.vram[vdp.ntab + ((v_line >> 3) << 6)];
-    int nt_scroll = (hscroll >> 3);
-    dword atex_mask;
-    dword *cache_ptr;
-    dword *linebuf_ptr = (dword *)&linebuf[0 - (hscroll & 7)];
-
-    /* Draw a line of the background */
-    for(column = vp_hstart; column <= vp_hend; column += 1)
-    {
-        /* Get name table attribute word */
-        attr = nt[(column + nt_scroll) & 0x1F];
-
-#ifndef LSB_FIRST
-        attr = (((attr & 0xFF) << 8) | ((attr & 0xFF00) >> 8));
-#endif
-        /* Expand priority and palette bits */
-        atex_mask = atex[(attr >> 11) & 3];
-
-        /* Point to a line of pattern data in cache */
-        cache_ptr = (dword *)&cache[((attr & 0x7FF) << 6) | (v_row)];
-
-        /* Copy the left half, adding the attribute bits in */
-        write_dword( &linebuf_ptr[(column << 1)] , read_dword( &cache_ptr[0] ) | (atex_mask));
-
-        /* Copy the right half, adding the attribute bits in */
-        write_dword( &linebuf_ptr[(column << 1) | (1)], read_dword( &cache_ptr[1] ) | (atex_mask));
     }
 }
 
